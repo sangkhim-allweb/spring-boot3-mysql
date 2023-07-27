@@ -3,11 +3,11 @@ package com.sangkhim.spring_boot3_mysql.exception.base;
 import com.sangkhim.spring_boot3_mysql.exception.BadRequestException;
 import com.sangkhim.spring_boot3_mysql.exception.DataNotFoundException;
 import com.sangkhim.spring_boot3_mysql.exception.DuplicateException;
+import com.sangkhim.spring_boot3_mysql.exception.ForbiddenException;
 import com.sangkhim.spring_boot3_mysql.exception.TooManyRequestsException;
+import com.sangkhim.spring_boot3_mysql.exception.UnauthorizedException;
 import com.sangkhim.spring_boot3_mysql.exception.dto.ErrorResponse;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -24,13 +24,12 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 @RestControllerAdvice
 public class BaseControllerAdvice {
 
-  public static final Instant TIMESTAMP =
-      LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant();
+  public static final Timestamp TIMESTAMP = new Timestamp(System.currentTimeMillis());
 
   @ExceptionHandler({NoHandlerFoundException.class})
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ErrorResponse noHandlerFoundException(NoHandlerFoundException ex) {
-    LOGGER.debug(ex.getMessage(), ex.getCause());
+    log.debug(ex.getMessage(), ex.getCause());
     return new ErrorResponse(
         String.valueOf(HttpStatus.NOT_FOUND.value()),
         "No resource found for your request. Please verify you request",
@@ -40,7 +39,7 @@ public class BaseControllerAdvice {
   @ExceptionHandler({DataNotFoundException.class})
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public ErrorResponse dataNotFoundException(Exception ex) {
-    LOGGER.debug(ex.getMessage(), ex.getCause());
+    log.debug(ex.getMessage(), ex.getCause());
     return new ErrorResponse(
         String.valueOf(HttpStatus.NOT_FOUND.value()), ex.getMessage(), TIMESTAMP);
   }
@@ -50,6 +49,20 @@ public class BaseControllerAdvice {
   public ErrorResponse handleBadRequestException(Exception ex) {
     return new ErrorResponse(
         String.valueOf(HttpStatus.BAD_REQUEST.value()), ex.getMessage(), TIMESTAMP);
+  }
+
+  @ExceptionHandler({UnauthorizedException.class})
+  @ResponseStatus(HttpStatus.UNAUTHORIZED)
+  public ErrorResponse handleUnauthorizedException(Exception ex) {
+    return new ErrorResponse(
+        String.valueOf(HttpStatus.UNAUTHORIZED.value()), ex.getMessage(), TIMESTAMP);
+  }
+
+  @ExceptionHandler({ForbiddenException.class})
+  @ResponseStatus(HttpStatus.FORBIDDEN)
+  public ErrorResponse handleForbiddenException(Exception ex) {
+    return new ErrorResponse(
+        String.valueOf(HttpStatus.FORBIDDEN.value()), ex.getMessage(), TIMESTAMP);
   }
 
   @ExceptionHandler({TooManyRequestsException.class})
@@ -62,7 +75,7 @@ public class BaseControllerAdvice {
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
   public ErrorResponse notSupportedException(HttpRequestMethodNotSupportedException ex) {
-    LOGGER.debug(ex.getMessage(), ex.getCause());
+    log.debug(ex.getMessage(), ex.getCause());
     return new ErrorResponse(
         String.valueOf(HttpStatus.METHOD_NOT_ALLOWED.value()),
         "Method Not Allowed. Please verify you request",
@@ -72,7 +85,7 @@ public class BaseControllerAdvice {
   @ExceptionHandler({Exception.class, ServiceException.class})
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public ErrorResponse handleAllExceptions(Exception ex) {
-    LOGGER.error(ex.getMessage(), ex.getLocalizedMessage());
+    log.error(ex.getMessage(), ex.getLocalizedMessage());
     return new ErrorResponse(
         String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()), ex.getMessage(), TIMESTAMP);
   }
