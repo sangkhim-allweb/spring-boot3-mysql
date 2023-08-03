@@ -1,4 +1,4 @@
-# spring-boot3-mysql
+# Spring Boot 3 MySQl Database
 
 ## swagger
     http://localhost:8080/api/
