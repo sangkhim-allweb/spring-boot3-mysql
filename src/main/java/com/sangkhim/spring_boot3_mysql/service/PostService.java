@@ -2,31 +2,37 @@ package com.sangkhim.spring_boot3_mysql.service;
 
 import com.sangkhim.spring_boot3_mysql.exception.BadRequestException;
 import com.sangkhim.spring_boot3_mysql.exception.DataNotFoundException;
+import com.sangkhim.spring_boot3_mysql.model.dto.PostDTO;
+import com.sangkhim.spring_boot3_mysql.model.entity.Author;
 import com.sangkhim.spring_boot3_mysql.model.entity.Post;
 import com.sangkhim.spring_boot3_mysql.model.entity.Tag;
+import com.sangkhim.spring_boot3_mysql.repository.AuthorRepository;
 import com.sangkhim.spring_boot3_mysql.repository.PostRepository;
 import com.sangkhim.spring_boot3_mysql.repository.TagRepository;
-import com.sangkhim.spring_boot3_mysql.utils.PageUtils;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
+import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PostService {
+
+  private final ModelMapper modelMapper;
 
   private final PostRepository postRepository;
 
+  private final AuthorRepository authorRepository;
+
   private final TagRepository tagRepository;
 
+  @Cacheable(value = "posts")
   public List<Post> getAllPosts(String title) {
-
-    Page<Post> postListWithPagination =
-        postRepository.findAllPostsWithPagination(PageUtils.pageable(1, 10, "title", "ASC"));
-
     List<Post> postList;
     if (title == null) {
       postList = postRepository.findAll();
@@ -37,16 +43,15 @@ public class PostService {
   }
 
   public Post getById(Long id) {
-    Optional<Post> post = postRepository.findById(id);
-    if (post.isPresent()) {
-      return post.get();
-    } else {
-      throw new DataNotFoundException(
-          MessageFormat.format("Post id {0} not found", String.valueOf(id)));
-    }
+    return postRepository
+        .findById(id)
+        .orElseThrow(
+            () ->
+                new DataNotFoundException(
+                    MessageFormat.format("Post id {0} not found", String.valueOf(id))));
   }
 
-  public Post createOrUpdate(Post postRequest) {
+  public Post createOrUpdate(PostDTO postRequest) {
     Optional<Post> existingPost = postRepository.findById(postRequest.getId());
 
     if (existingPost.isPresent()) {
@@ -54,13 +59,14 @@ public class PostService {
 
       postUpdate.setTitle(postRequest.getTitle());
       postUpdate.setBody(postRequest.getBody());
-
-      // save foreign key
-      postUpdate.setAuthor(postRequest.getAuthor());
+      if (postRequest.getAuthorId() != 0) {
+        Optional<Author> author = authorRepository.findById(postRequest.getAuthorId());
+        author.ifPresent(postUpdate::setAuthor);
+      }
 
       return postRepository.save(postUpdate);
     } else {
-      return postRepository.save(postRequest);
+      return postRepository.save(modelMapper.map(postRequest, Post.class));
     }
   }
 
@@ -75,34 +81,31 @@ public class PostService {
   }
 
   public Tag addTag(Long postId, Tag tagRequest) {
-    Tag existing =
-        postRepository
-            .findById(postId)
-            .map(
-                post -> {
-                  Optional<Tag> existingTag = tagRepository.findById(tagRequest.getId());
-                  if (tagRequest.getId() != 0) {
-                    if (existingTag.isPresent()) {
-                      post.addTag(existingTag.get());
-                      postRepository.save(post);
-                      return existingTag.get();
-                    } else {
-                      throw new DataNotFoundException(
-                          MessageFormat.format(
-                              "Tag id {0} not found", String.valueOf(tagRequest.getId())));
-                    }
-                  } else {
-                    // create new tag
-                    post.addTag(tagRequest);
-                    return tagRepository.save(tagRequest);
-                  }
-                })
-            .orElseThrow(
-                () ->
-                    new DataNotFoundException(
-                        MessageFormat.format("Post id {0} not found", String.valueOf(postId))));
-
-    return existing;
+    return postRepository
+        .findById(postId)
+        .map(
+            post -> {
+              Optional<Tag> existingTag = tagRepository.findById(tagRequest.getId());
+              if (tagRequest.getId() != 0) {
+                if (existingTag.isPresent()) {
+                  post.addTag(existingTag.get());
+                  postRepository.save(post);
+                  return existingTag.get();
+                } else {
+                  throw new DataNotFoundException(
+                      MessageFormat.format(
+                          "Tag id {0} not found", String.valueOf(tagRequest.getId())));
+                }
+              } else {
+                // create new tag
+                post.addTag(tagRequest);
+                return tagRepository.save(tagRequest);
+              }
+            })
+        .orElseThrow(
+            () ->
+                new DataNotFoundException(
+                    MessageFormat.format("Post id {0} not found", String.valueOf(postId))));
   }
 
   public void deleteTagFromPost(Long postId, Long tagId) {

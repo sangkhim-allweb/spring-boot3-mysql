@@ -22,13 +22,12 @@ public class TagService {
   }
 
   public Tag getById(Long id) {
-    Optional<Tag> tag = tagRepository.findById(id);
-    if (tag.isPresent()) {
-      return tag.get();
-    } else {
-      throw new DataNotFoundException(
-          MessageFormat.format("Tag id {0} not found", String.valueOf(id)));
-    }
+    return tagRepository
+        .findById(id)
+        .orElseThrow(
+            () ->
+                new DataNotFoundException(
+                    MessageFormat.format("Tag id {0} not found", String.valueOf(id))));
   }
 
   public Tag createOrUpdate(Tag tagRequest) {
